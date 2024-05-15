@@ -1,5 +1,5 @@
 
-// =========== НАСТРОЙКИ ===========
+// Настройки
 #define DEBUG 0       // режим отладки
 #define ENC_TYPE 0   // тип энкодера, 0 или 1
 #define INV_WHEEL 0   // инверсия руля
@@ -69,8 +69,8 @@ void setup() {
 
 void loop() {
   gamepadTick();
-   debug();
-  // writeMotor();
+   // debug();
+  writeMotor();
   // при нажатии кнопки калибровки скидываем позицию руля в 0
   if (!digitalRead(BCALL)) {
     encCounter = 0;
@@ -92,14 +92,14 @@ void encTick() {
 
 // блокировка мотором
 void writeMotor(){
-  if(encCounter < -wheelMax && encCounter > -wheelMax-100){
+  if(encCounter < -wheelMax && encCounter > -wheelMax-200){
     digitalWrite(LPWM, 250);
     digitalWrite(RPWM, 0);
   } else {
     digitalWrite(LPWM, 0);
     digitalWrite(RPWM, 0);
   }
-  if(encCounter > wheelMax && encCounter < wheelMax+100){
+  if(encCounter > wheelMax && encCounter < wheelMax+200){
     digitalWrite(LPWM, 0);
     digitalWrite(RPWM, 250);
   } else {
@@ -110,7 +110,7 @@ void writeMotor(){
 
 // калибровка
 void calibration() {
-    int wm=1800;
+    int wm=1500;
     Serial.begin(9600);
     delay(100);
     Serial.print(F("Calibration start"));
@@ -149,7 +149,7 @@ void calibration() {
     Serial.println(maxBR);
     Serial.println();
     Serial.end();
-    delay(10000);  // задержка чтобы кнопку отпустить
+    delay(5000);
 }
 
 // дебаг
@@ -172,12 +172,10 @@ void debug() {
   Serial.end();
 }
 
-// опрос энкодера в прерывании
 ISR(TIMER3_COMPA_vect) {
   encTick();
 }
 
-// ставим таймер 3, канал А, период 0.5 мс. Для опроса энкодера
 void setupTmr() {
   TCCR3B = 0b00001001;
   TIMSK3 = 0b00000010;
@@ -204,18 +202,6 @@ void gamepadTick() {
     if (INV_WHEEL) wheel = constrain(-encCounter, -wheelMax, wheelMax);
     else wheel = constrain(encCounter, -wheelMax, wheelMax);
     wheel = map(wheel, -wheelMax, wheelMax, -32768, 32767);
-    // Serial.print(wheel);
-    // Serial.print("\t");
-    // if(wheel > 0 )
-    //   if(wheel+4100<=32737)
-    //     Gamepad.xAxis(wheel+4100);
-    //   else 
-    //     Gamepad.xAxis(32737);
-    // else 
-    //   if(wheel-4100>=-32737)
-    //     Gamepad.xAxis(wheel-4100);
-    //   else 
-    //     Gamepad.xAxis(-32737);
     Gamepad.xAxis(wheel);
 
     int thr, br;
@@ -226,7 +212,7 @@ void gamepadTick() {
     br = map(analogRead(POT_BR), brakeMin, brakeMax, -128, 127);
     br = constrain(br, -128, 127);
     Gamepad.rzAxis(br);
-
+    // Если кнопка нажата, нажать ее на геймпаде
     if (!digitalRead(D0)) Gamepad.press(1);
     else Gamepad.release(1);
     if (!digitalRead(D1)) Gamepad.press(2);
