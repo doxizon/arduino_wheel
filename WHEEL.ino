@@ -67,8 +67,8 @@ void setup() {
 void loop() {
   gT();
    debug();
-  // writeMotor();
-  // при нажатии кнопки калибровки скидываем позицию руля в 0
+  writeMotor();
+  
   if (!digitalRead(BCALL)) {
     ec = 0;
   }
