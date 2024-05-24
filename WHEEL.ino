@@ -1,9 +1,5 @@
-
-// Настройки
-#define DEBUG 0       // режим отладки
-#define ENC_TYPE 0   // тип энкодера, 0 или 1
-#define INV_WHEEL 0   // инверсия руля
-
+#define INV_WHEEL 0 
+#define citycar 1 // это чисто моя настройка для city car driving 
 // пины
 #define ENC_A 5       // пин энкодера
 #define ENC_B 6       // пин энкодера
@@ -25,18 +21,20 @@
 #define D17 A3       // кнопка
 #define BCALL A5
 
-volatile int encCounter = 0;
-volatile boolean state0, lastState, turnFlag;
-int throttleMin, throttleMax, brakeMin, brakeMax, wheelMax;
-uint32_t timer;
+volatile int ec = 0;
+volatile boolean s0, lasts;
+int tMi, tMa, bMi, bMa, whMa;
+uint32_t tim;
 #include <EEPROM.h>
 #include "HID-Project.h"
+
 void encTick();
 void calibration();
 void debug();
 void setupTmr();
-void gamepadTick();
+void gT();
 void writeMotor();
+
 void setup() {
   pinMode(D0, INPUT_PULLUP);
   pinMode(D1, INPUT_PULLUP);
@@ -56,50 +54,43 @@ void setup() {
   pinMode(ENC_A, INPUT_PULLUP);
 //  calibration();
   setupTmr();
-   debug();
+  debug();
   
-  EEPROM.get(0, throttleMin);
-  EEPROM.get(2, brakeMin);
-  EEPROM.get(4, throttleMax);
-  EEPROM.get(6, brakeMax);
-  EEPROM.get(8, wheelMax);
+  EEPROM.get(0, tMi);
+  EEPROM.get(2, bMi);
+  EEPROM.get(4, tMa);
+  EEPROM.get(6, bMa);
+  EEPROM.get(8, whMa);
   Gamepad.begin();
-  //Serial.begin(9600);
 }
 
 void loop() {
-  gamepadTick();
-   // debug();
-  writeMotor();
+  gT();
+   debug();
+  // writeMotor();
   // при нажатии кнопки калибровки скидываем позицию руля в 0
   if (!digitalRead(BCALL)) {
-    encCounter = 0;
+    ec = 0;
   }
 }
 void encTick() {
-  state0 = digitalRead(ENC_A);
-  if (state0 != lastState) {
-#if (ENC_TYPE == 1)
-    turnFlag = !turnFlag;
-    if (turnFlag)
-      encCounter += (digitalRead(ENC_B) != lastState) ? -1 : 1;
-#else
-    encCounter += (digitalRead(ENC_B) != lastState) ? -1 : 1;
-#endif
-    lastState = state0;
+  s0 = digitalRead(ENC_A);
+  if (s0 != lasts) {
+    ec += (digitalRead(ENC_B) != lasts) ? -1 : 1;
+    lasts = s0;
   }
 }
 
 // блокировка мотором
 void writeMotor(){
-  if(encCounter < -wheelMax && encCounter > -wheelMax-200){
+  if(ec < -whMa){
     digitalWrite(LPWM, 250);
     digitalWrite(RPWM, 0);
   } else {
     digitalWrite(LPWM, 0);
     digitalWrite(RPWM, 0);
   }
-  if(encCounter > wheelMax && encCounter < wheelMax+200){
+  if(ec > whMa){
     digitalWrite(LPWM, 0);
     digitalWrite(RPWM, 250);
   } else {
@@ -110,20 +101,19 @@ void writeMotor(){
 
 // калибровка
 void calibration() {
-    int wm=1500;
+    int wm=1800;
     Serial.begin(9600);
     delay(100);
-    Serial.print(F("Calibration start"));
-    encCounter = 0;
-    int zeroTHR = analogRead(POT_THR);
-    int zeroBR = analogRead(POT_BR);
+    Serial.println("calibration");
+    ec = 0;
+    int zt = analogRead(POT_THR);
+    int zb = analogRead(POT_BR);
     int maxTHR, maxBR, maxWHEEL;
 
-    EEPROM.put(0, zeroTHR);
-    EEPROM.put(2, zeroBR);
+    EEPROM.put(0, zt);
+    EEPROM.put(2, zb);
     delay(100);                     // дебаунс
     for(int i=0;i<10;i++) {                  // крутимся
-      
       maxTHR = analogRead(POT_THR);
       maxBR = analogRead(POT_BR);
       Serial.println(maxTHR);
@@ -136,56 +126,50 @@ void calibration() {
     EEPROM.put(6, maxBR);
     EEPROM.put(8, wm);
 
-    Serial.println(F("Calibration end"));
-    Serial.print(F("Wheel: "));
-    Serial.println(wm);
+    Serial.println(F("end"));
     Serial.print(F("Throat: "));
-    Serial.print(zeroTHR);
+    Serial.print(zt);
     Serial.print(" - ");
     Serial.println(maxTHR);
     Serial.print(F("Brake: "));
-    Serial.print(zeroBR);
+    Serial.print(zb);
     Serial.print(" - ");
     Serial.println(maxBR);
     Serial.println();
     Serial.end();
-    delay(5000);
+    delay(10000);  
 }
 
 // дебаг
 void debug() {
-
   Serial.begin(9600);
-  uint32_t timer;
-  
-    encTick();
-    if (millis() - timer > 100) {
-      timer = millis();
-      Serial.print(encCounter);
-      Serial.print("\t");
-      Serial.print(analogRead(POT_THR));
-      Serial.print("\t");
-      Serial.println(analogRead(POT_BR));
-      Serial.print("\t");
-    }
-  
+  uint32_t tim;
+  encTick();
+  if (millis() - tim > 100) {
+    tim = millis();
+    Serial.print(ec);
+    Serial.print("\t");
+    Serial.print(analogRead(POT_THR));
+    Serial.print("\t");
+    Serial.println(analogRead(POT_BR));
+    Serial.print("\t");
+  }
   Serial.end();
 }
 
-ISR(TIMER3_COMPA_vect) {
+ISR(tim3_COMPA_vect) {
   encTick();
 }
-
 void setupTmr() {
   TCCR3B = 0b00001001;
   TIMSK3 = 0b00000010;
   OCR3AH = highByte(15999 / 2);
   OCR3AL = lowByte(15999 / 2);
 }
-
+// Настройка коробки передач для city car driving
 void akpp(){
     bool ture = true;
-    if(!digitalRead(D))ture=false;
+    if(!digitalRead(D)) ture=false;
     if(!digitalRead(R)) ture=false;
       if(ture) Gamepad.press(13);
        else Gamepad.release(13);
@@ -195,24 +179,22 @@ void akpp(){
      else Gamepad.release(9);
 }
 
-void gamepadTick() {
-  if (millis() - timer > 10) {
-    timer = millis();
+void gT() {
+  if (millis() - tim > 10) {
+    tim = millis();
     int wheel;
-    if (INV_WHEEL) wheel = constrain(-encCounter, -wheelMax, wheelMax);
-    else wheel = constrain(encCounter, -wheelMax, wheelMax);
-    wheel = map(wheel, -wheelMax, wheelMax, -32768, 32767);
+    if (INV_WHEEL) wheel = constrain(-ec, -whMa, whMa);
+    else wheel = constrain(ec, -whMa, whMa);
+    wheel = map(wheel, -whMa, whMa, -32768, 32767);
     Gamepad.xAxis(wheel);
-
     int thr, br;
-    thr = map(analogRead(POT_THR), throttleMin, throttleMax, -128, 127);
+    thr = map(analogRead(POT_THR), tMi, tMa, -128, 127);
     thr = constrain(thr, -128, 127);
     Gamepad.zAxis(thr);
-
-    br = map(analogRead(POT_BR), brakeMin, brakeMax, -128, 127);
+    br = map(analogRead(POT_BR), bMi, bMa, -128, 127);
     br = constrain(br, -128, 127);
     Gamepad.rzAxis(br);
-    // Если кнопка нажата, нажать ее на геймпаде
+    // кнопки
     if (!digitalRead(D0)) Gamepad.press(1);
     else Gamepad.release(1);
     if (!digitalRead(D1)) Gamepad.press(2);
@@ -227,7 +209,14 @@ void gamepadTick() {
     else Gamepad.release(6);
     if (!digitalRead(D8)) Gamepad.press(7);
     else Gamepad.release(7);
-    akpp();
+    #ifndef citycar
+      akpp(); 
+    #else
+      if (!digitalRead(D13)) Gamepad.press(8);
+      else Gamepad.release(8);
+      if (!digitalRead(D16)) Gamepad.press(9);
+      else Gamepad.release(9);
+    #endif
     if (!digitalRead(D13)) Gamepad.press(10);
     else Gamepad.release(10);
     if (!digitalRead(D16)) Gamepad.press(11);
